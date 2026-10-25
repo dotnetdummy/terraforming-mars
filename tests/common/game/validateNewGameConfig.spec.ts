@@ -10,6 +10,7 @@ import {ColonyName} from '../../../src/common/colonies/ColonyName';
 import {Expansion} from '../../../src/common/cards/GameModule';
 import {LogMessageDataType} from '../../../src/common/logs/LogMessageDataType';
 import {CEO_CARDS_DEALT_PER_PLAYER} from '../../../src/common/constants';
+import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY, EventPushConfig} from '../../../src/common/game/EventPush';
 
 function player(first: boolean = false): NewPlayerModel {
   return {name: 'Robot', color: 'blue', beginner: false, handicap: 0, first};
@@ -96,6 +97,7 @@ const NO_ERRORS: ValidationErrors = {
   prelude2WithoutPrelude: false,
   deltaProjectWithoutPrelude: false,
   notEnoughCorporations: 0,
+  eventPush: '',
 };
 
 function helpers(
@@ -273,6 +275,40 @@ describe('validateNewGameConfig', () => {
     expect(validate({customCeos: [CardName.KAREN], startingCeos: 0}).notEnoughCeos).eq(2 * CEO_CARDS_DEALT_PER_PLAYER);
     expect(validate({customCeos: [CardName.KAREN], startingCeos: 1}).notEnoughCeos).eq(2 * CEO_CARDS_DEALT_PER_PLAYER);
     expect(validate({customCeos: [CardName.KAREN], startingCeos: 4}).notEnoughCeos).eq(2 * 4);
+  });
+
+  function validEventPush(overrides: Partial<EventPushConfig> = {}): EventPushConfig {
+    return {
+      url: 'https://example.com/hook',
+      token: 'secret',
+      gameStarted: {enabled: true, body: DEFAULT_GAME_STARTED_BODY},
+      waitingForPlayer: {enabled: true, body: DEFAULT_WAITING_FOR_PLAYER_BODY},
+      ...overrides,
+    };
+  }
+
+  it('accepts event push with the default bodies', () => {
+    expect(validate({eventPush: validEventPush()}).eventPush).eq('');
+  });
+
+  it('rejects an event push URL that is not http(s)', () => {
+    expect(validate({eventPush: validEventPush({url: 'ftp://example.com/hook'})}).eventPush).eq('Event push URL must be http or https.');
+  });
+
+  it('rejects an event push body that is not JSON', () => {
+    expect(validate({
+      eventPush: validEventPush({
+        waitingForPlayer: {enabled: true, body: '{ "text": {{playerName}} }'},
+      }),
+    }).eventPush).eq('Waiting for player: Body must be JSON after substituting variables.');
+  });
+
+  it('rejects an unknown event push variable', () => {
+    expect(validate({
+      eventPush: validEventPush({
+        gameStarted: {enabled: true, body: '{ "text": "{{playerName}}" }'},
+      }),
+    }).eventPush).eq('Game started: Unknown variable playerName');
   });
 
   it('messages', () => {

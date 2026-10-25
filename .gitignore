@@ -29,3 +29,6 @@ node_modules/
 
 # For any local work you don't want caught up in git.
 local/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

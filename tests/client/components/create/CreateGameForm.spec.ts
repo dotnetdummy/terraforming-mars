@@ -72,6 +72,47 @@ describe('CreateGameForm', () => {
     expect(wrapper.exists()).to.be.true;
   });
 
+  it('includes event push on the submitted config when it is enabled', async () => {
+    const wrapper = shallowMount(CreateGameForm, {
+      ...globalConfig,
+    });
+    expect(wrapper.text()).to.contain('Event push');
+    expect((wrapper.vm as any).newGameConfig.eventPush).eq(undefined);
+
+    (wrapper.vm as any).eventPushEnabled = true;
+    (wrapper.vm as any).eventPushUrl = 'https://example.com/hook';
+    (wrapper.vm as any).eventPushToken = 'secret';
+    await wrapper.vm.$nextTick();
+
+    const eventPush = (wrapper.vm as any).newGameConfig.eventPush;
+    expect(eventPush.url).eq('https://example.com/hook');
+    expect(eventPush.token).eq('secret');
+    expect(eventPush.gameStarted.enabled).eq(true);
+    expect(eventPush.waitingForPlayer.body).to.contain('{{playerName}}');
+    expect(wrapper.text()).to.contain('{{#players}}');
+    expect(wrapper.text()).to.contain('{{color}}');
+  });
+
+  it('restores saved event push settings', () => {
+    createGameSettingsStorage.save(createNewGameConfig({
+      eventPush: {
+        url: 'https://example.com/hook',
+        token: 'secret',
+        gameStarted: {enabled: false, body: '{"ok":true}'},
+        waitingForPlayer: {enabled: true, body: '{"text":"{{playerName}}"}'},
+      },
+    }));
+    const wrapper = shallowMount(CreateGameForm, {
+      ...globalConfig,
+    });
+    const vm = wrapper.vm as any;
+    expect(vm.eventPushEnabled).eq(true);
+    expect(vm.eventPushUrl).eq('https://example.com/hook');
+    expect(vm.eventPushToken).eq('secret');
+    expect(vm.eventPushGameStarted).eq(false);
+    expect(vm.eventPushWaitingForPlayerBody).eq('{"text":"{{playerName}}"}');
+  });
+
 
   it('restores the last saved game settings on load', async () => {
     createGameSettingsStorage.save(createNewGameConfig({

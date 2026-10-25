@@ -18,6 +18,7 @@ import {AwardName} from '../common/ma/AwardName';
 import {GlobalParameter} from '../common/GlobalParameter';
 import {MilestoneName} from '../common/ma/MilestoneName';
 import {Tag} from '../common/cards/Tag';
+import {EventPushConfig} from '../common/game/EventPush';
 
 export type SerializedGame = {
     activePlayer: PlayerId;
@@ -72,4 +73,5 @@ export type SerializedGame = {
     underworldData: UnderworldData;
     venusScaleLevel: number;
     verminInEffect: boolean;
+    eventPush?: EventPushConfig;
 }

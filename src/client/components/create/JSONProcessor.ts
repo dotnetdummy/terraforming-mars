@@ -11,6 +11,15 @@ import {sanitizeEscapeVelocityOptions} from '@/common/game/escapeVelocity';
 import {BoardName} from '@/common/boards/BoardName';
 import {RandomBoardOption} from '@/common/boards/RandomBoardOption';
 import {boardOptions} from '@/common/boards/randomBoardOptions';
+import {EventPushConfig} from '@/common/game/EventPush';
+
+function isEventConfig(value: unknown): value is EventPushConfig['gameStarted'] {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const event = value as EventPushConfig['gameStarted'];
+  return typeof event.enabled === 'boolean' && typeof event.body === 'string';
+}
 
 function safeBoolean(val: JSONValue): boolean {
   if (typeof val === 'boolean') {
@@ -72,6 +81,7 @@ export class JSONProcessor {
 
     this.bannedCards = set(json_constants.BANNED_CARDS);
     this.includedCards = set(json_constants.INCLUDED_CARDS);
+    this.applyEventPush(json.eventPush);
 
     this.model.playersCount = players.length;
     this.model.showBannedCards = this.bannedCards.length > 0;
@@ -129,6 +139,7 @@ export class JSONProcessor {
       'escapeVelocity',
       'players',
       'solarPhaseOption',
+      'eventPush',
       'constants'];
     for (const k in json) {
       if (ignoredFields.includes(k)) {
@@ -151,6 +162,28 @@ export class JSONProcessor {
     this.validateCardNames('customCeos', this.model.customCeos);
     this.validateCardNames('bannedCards', this.bannedCards);
     this.validateCardNames('includedCards', this.includedCards);
+  }
+
+  private applyEventPush(value: JSONValue | undefined): void {
+    if (value === undefined || typeof value !== 'object' || Array.isArray(value)) {
+      return;
+    }
+    const eventPush = value as unknown as EventPushConfig;
+    this.model.eventPushEnabled = true;
+    if (typeof eventPush.url === 'string') {
+      this.model.eventPushUrl = eventPush.url;
+    }
+    if (typeof eventPush.token === 'string') {
+      this.model.eventPushToken = eventPush.token;
+    }
+    if (isEventConfig(eventPush.gameStarted)) {
+      this.model.eventPushGameStarted = eventPush.gameStarted.enabled;
+      this.model.eventPushGameStartedBody = eventPush.gameStarted.body;
+    }
+    if (isEventConfig(eventPush.waitingForPlayer)) {
+      this.model.eventPushWaitingForPlayer = eventPush.waitingForPlayer.enabled;
+      this.model.eventPushWaitingForPlayerBody = eventPush.waitingForPlayer.body;
+    }
   }
 
   private validateCardNames(fieldLabel: string, names: ReadonlyArray<CardName>): void {

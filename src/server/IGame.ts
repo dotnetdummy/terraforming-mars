@@ -35,6 +35,7 @@ import {UnderworldData} from './underworld/UnderworldData';
 import {OrOptions} from './inputs/OrOptions';
 import {IStandardProjectCard} from './cards/IStandardProjectCard';
 import {GlobalParameterTracks} from '@/server/boards/GlobalParameterTracks';
+import {EventPushConfig} from '@/common/game/EventPush';
 
 export interface Score {
   corporation: String;
@@ -49,6 +50,8 @@ export interface IGame extends Logger {
   lastSaveId: number;
   readonly rng: SeededRandom;
   readonly spectatorId: SpectatorId;
+  /** Outbound event push configured when the game was created. Absent when the creator did not set one. */
+  eventPush: EventPushConfig | undefined;
   deferredActions: DeferredActionsQueue;
   /** Run every deferred action, including any added while running them, and then call `cb`. */
   drainQueue(cb: () => void): void;

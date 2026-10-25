@@ -19,6 +19,8 @@ import {readBody} from './readBody';
 import {RouteError} from './RouteError';
 import {CEO_CARDS_DEALT_PER_PLAYER} from '../../common/constants';
 import {hasNegativeEscapeVelocityOption, sanitizeEscapeVelocityOptions} from '../../common/game/escapeVelocity';
+import {eventPushError} from '../../common/game/EventPush';
+import {notifyGameCreated} from '../game/EventPush';
 
 function parseQuotaConfig(struct: any): QuotaConfig {
   let {limit} = struct;
@@ -109,6 +111,10 @@ export class ApiCreateGame extends Handler {
       if (gameReq.escapeVelocity !== undefined && hasNegativeEscapeVelocityOption(gameReq.escapeVelocity)) {
         throw RouteError.badRequest('Escape Velocity values cannot be negative.');
       }
+      const eventPushMessage = eventPushError(gameReq.eventPush);
+      if (eventPushMessage !== undefined) {
+        throw RouteError.badRequest(eventPushMessage);
+      }
       const gameId = safeCast(generateRandomId('g'), isGameId);
       const spectatorId = safeCast(generateRandomId('s'), isSpectatorId);
       const players = gameReq.players.map((p) => {
@@ -188,12 +194,18 @@ export class ApiCreateGame extends Handler {
       let game: IGame;
       if (gameOptions.clonedGamedId !== undefined && !gameOptions.clonedGamedId.startsWith('#')) {
         const serialized = await Database.getInstance().getGameVersion(gameOptions.clonedGamedId, 0);
+        if (gameReq.eventPush === undefined) {
+          delete serialized.eventPush;
+        } else {
+          serialized.eventPush = gameReq.eventPush;
+        }
         game = Cloner.clone(gameId, players, firstPlayerIdx, serialized);
       } else {
         const seed = Math.random();
-        game = Game.newInstance(gameId, players, players[firstPlayerIdx], spectatorId, gameOptions, seed);
+        game = Game.newInstance(gameId, players, players[firstPlayerIdx], spectatorId, gameOptions, seed, gameReq.eventPush);
       }
       ctx.gameLoader.add(game);
+      notifyGameCreated(game);
       responses.writeJson(res, ctx, Server.getSimpleGameModel(game));
     } catch (error) {
       if (error instanceof RouteError) {

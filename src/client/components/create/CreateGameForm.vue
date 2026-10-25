@@ -468,6 +468,43 @@
                     </div>
                 </div>
 
+                <div class="create-game-event-push">
+                  <label class="form-switch">
+                    <input type="checkbox" v-model="eventPushEnabled" id="event-push-enabled" data-test="event-push-enabled">
+                    <i class="form-icon"></i>
+                    <span v-i18n>Event push</span>
+                  </label>
+                  <div v-if="eventPushEnabled">
+                    <div class="form-group">
+                      <label class="form-label" for="event-push-url" v-i18n>URL</label>
+                      <input class="form-input" type="url" id="event-push-url" v-model="eventPushUrl" data-test="event-push-url">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="event-push-token" v-i18n>Token</label>
+                      <input class="form-input" type="password" id="event-push-token" v-model="eventPushToken" autocomplete="off" data-test="event-push-token">
+                    </div>
+                    <label class="form-switch">
+                      <input type="checkbox" v-model="eventPushGameStarted" id="event-push-game-started">
+                      <i class="form-icon"></i>
+                      <span v-i18n>Game started</span>
+                    </label>
+                    <template v-if="eventPushGameStarted">
+                      <textarea class="form-input" rows="4" v-model="eventPushGameStartedBody" data-test="event-push-game-started-body"></textarea>
+                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ gameStartedVariables }}</div>
+                      <div class="create-game-event-push-variables"><span v-i18n>Player list</span>: {{ playerListExample }} ({{ playerItemVariables }})</div>
+                    </template>
+                    <label class="form-switch">
+                      <input type="checkbox" v-model="eventPushWaitingForPlayer" id="event-push-waiting">
+                      <i class="form-icon"></i>
+                      <span v-i18n>Waiting for player</span>
+                    </label>
+                    <template v-if="eventPushWaitingForPlayer">
+                      <textarea class="form-input" rows="4" v-model="eventPushWaitingForPlayerBody" data-test="event-push-waiting-body"></textarea>
+                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ waitingForPlayerVariables }}</div>
+                    </template>
+                  </div>
+                </div>
+
                 <div class="create-game-action-row">
                     <div class="create-game-action">
                         <label>
@@ -587,7 +624,12 @@ import {RULEBOOK_URLS, WIKI_URLS} from '@/client/utils/WikiLinks';
 import {setDocumentTitle} from '@/client/utils/documentTitle';
 import {sanitizeEscapeVelocityOptions} from '@/common/game/escapeVelocity';
 import {validateNewGameConfig, validationDetails, ValidationErrors} from '@/common/game/validateNewGameConfig';
+import {GAME_STARTED_VARIABLES, PLAYER_ITEM_VARIABLES, WAITING_FOR_PLAYER_VARIABLES} from '@/common/game/EventPush';
 import ValidationErrorsPopup from './ValidationErrorsPopup.vue';
+
+function formatEventPushVariables(names: ReadonlyArray<string>): string {
+  return names.map((name) => `{{${name}}}`).join(', ');
+}
 
 type Refs = {
   file: HTMLInputElement;
@@ -752,6 +794,12 @@ export default defineComponent({
         twoCorpsVariant: this.twoCorpsVariant,
         startingCeos: this.startingCeos,
         startingPreludes: this.startingPreludes,
+        eventPush: this.eventPushEnabled ? {
+          url: this.eventPushUrl,
+          token: this.eventPushToken,
+          gameStarted: {enabled: this.eventPushGameStarted, body: this.eventPushGameStartedBody},
+          waitingForPlayer: {enabled: this.eventPushWaitingForPlayer, body: this.eventPushWaitingForPlayerBody},
+        } : undefined,
       };
     },
     validationErrors(): ValidationErrors {
@@ -794,6 +842,18 @@ export default defineComponent({
     },
     isBeginnerToggleEnabled(): Boolean {
       return !(this.initialDraft || this.expansions.prelude || this.expansions.venus || this.expansions.colonies || this.expansions.turmoil);
+    },
+    gameStartedVariables(): string {
+      return formatEventPushVariables(GAME_STARTED_VARIABLES);
+    },
+    playerListExample(): string {
+      return '{{#players}}- [{{name}}]({{link}})\\n{{/players}}';
+    },
+    playerItemVariables(): string {
+      return formatEventPushVariables(PLAYER_ITEM_VARIABLES);
+    },
+    waitingForPlayerVariables(): string {
+      return formatEventPushVariables(WAITING_FOR_PLAYER_VARIABLES);
     },
   },
   methods: {

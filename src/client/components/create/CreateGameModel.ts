@@ -62,4 +62,11 @@ export type CreateGameModel = {
   startingPreludes: number;
   twoCorpsVariant: boolean;
   undoOption: boolean;
+  eventPushEnabled: boolean;
+  eventPushUrl: string;
+  eventPushToken: string;
+  eventPushGameStarted: boolean;
+  eventPushGameStartedBody: string;
+  eventPushWaitingForPlayer: boolean;
+  eventPushWaitingForPlayerBody: string;
 }

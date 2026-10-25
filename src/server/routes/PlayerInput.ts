@@ -17,6 +17,7 @@ import {INVALID_RUN_ID, RESPONDING_TOO_QUICKLY} from '../../common/app/AppErrorI
 import {RouteError} from './RouteError';
 import {readBody} from './readBody';
 import {stringToNumber} from '../database/utils';
+import {notifyNewWaits, playersWithRequiredInput} from '../game/EventPush';
 
 export const playerInputMetrics = {
   responseInterval: new prometheus.Histogram({
@@ -70,6 +71,7 @@ export class PlayerInput extends Handler {
      * The second save being decremented is the action that was taken
      */
     const lastSaveId = player.game.lastSaveId - 2;
+    const previouslyWaiting = playersWithRequiredInput(player.game);
     try {
       const game = await ctx.gameLoader.restoreGameAt(player.game.id, lastSaveId);
       if (game === undefined) {
@@ -77,6 +79,7 @@ export class PlayerInput extends Handler {
       } else {
         // pull most recent player instance
         player = game.getPlayerById(player.id);
+        notifyNewWaits(game, previouslyWaiting);
       }
     } catch (err) {
       console.error(err);
@@ -101,7 +104,9 @@ export class PlayerInput extends Handler {
       if (this.isWaitingForUndo(player, entity)) {
         await this.performUndo(req, res, ctx, player);
       } else {
+        const previouslyWaiting = playersWithRequiredInput(player.game);
         player.process(entity);
+        notifyNewWaits(player.game, previouslyWaiting);
         responses.writeJson(res, ctx, Server.getPlayerModel(player));
       }
     } catch (e) {

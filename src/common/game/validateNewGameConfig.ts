@@ -8,6 +8,7 @@ import {Expansion} from '../cards/GameModule';
 import {Message} from '../logs/Message';
 import {LogMessageDataType} from '../logs/LogMessageDataType';
 import {BoardName} from '../boards/BoardName';
+import {eventPushError} from './EventPush';
 
 const REVISED_COUNT_ALGORITHM = false;
 
@@ -28,6 +29,8 @@ export type ValidationErrors = {
   prelude2WithoutPrelude: boolean;
   deltaProjectWithoutPrelude: boolean;
   notEnoughCorporations: number;
+  /** Empty when event push is off or valid. Otherwise the reason it cannot be saved. */
+  eventPush: string;
 };
 
 function mustSelectAtLeast(message: string, required: number): Message {
@@ -98,6 +101,10 @@ export const validationDetails: Record<keyof ValidationErrors, {blocking: boolea
     blocking: true,
     message: (errors) => mustSelectAtLeast('Must select at least ${0} corporations', errors.notEnoughCorporations),
   },
+  eventPush: {
+    blocking: true,
+    message: (errors) => ({message: errors.eventPush, data: []}),
+  },
 };
 
 export type Helpers = {
@@ -123,7 +130,10 @@ export function validateNewGameConfig(config: NewGameConfig, helpers: Helpers): 
     prelude2WithoutPrelude: false,
     deltaProjectWithoutPrelude: false,
     notEnoughCorporations: 0,
+    eventPush: '',
   };
+
+  errors.eventPush = eventPushError(config.eventPush) ?? '';
 
   if (config.escapeVelocity && hasNegativeEscapeVelocityOption(config.escapeVelocity)) {
     errors.negativeEscapeVelocity = true;

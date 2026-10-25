@@ -62,6 +62,7 @@ import {AddResourcesToCard} from './deferredActions/AddResourcesToCard';
 import {ColonyDeserializer} from './colonies/ColonyDeserializer';
 import {GameLoader} from './database/GameLoader';
 import {DEFAULT_GAME_OPTIONS, GameOptions} from './game/GameOptions';
+import {EventPushConfig} from '../common/game/EventPush';
 import {CorporationDeck, PreludeDeck, ProjectDeck, CeoDeck} from './cards/Deck';
 import {Logger} from './logs/Logger';
 import {addDays, stringToNumber} from './database/utils';
@@ -112,6 +113,8 @@ export class Game implements IGame, Logger {
   private clonedGamedId: string | undefined;
   public rng: SeededRandom;
   public spectatorId: SpectatorId;
+  /** Outbound event push configured when the game was created. Absent when the creator did not set one. */
+  public eventPush: EventPushConfig | undefined = undefined;
   public deferredActions: DeferredActionsQueue = new DeferredActionsQueue();
   public createdTime: Date = new Date(0);
   public gameAge: number = 0; // Each log event increases it
@@ -269,7 +272,8 @@ export class Game implements IGame, Logger {
     firstPlayer: IPlayer,
     spectatorId: SpectatorId,
     partialOptions: Partial<GameOptions> = {},
-    seed = 0): Game {
+    seed = 0,
+    eventPush?: EventPushConfig): Game {
     if (partialOptions.expansions === undefined) {
       partialOptions.expansions = {
         corpera: partialOptions.corporateEra ?? false,
@@ -458,6 +462,7 @@ export class Game implements IGame, Logger {
 
     game.log('Generation ${0}', (b) => b.forNewGeneration().number(game.generation));
 
+    game.eventPush = eventPush;
     game.gotoInitialPhase();
 
     return game;
@@ -538,6 +543,9 @@ export class Game implements IGame, Logger {
     }
     if (this.turmoil !== undefined) {
       result.turmoil = this.turmoil.serialize();
+    }
+    if (this.eventPush !== undefined) {
+      result.eventPush = this.eventPush;
     }
     return result;
   }
@@ -1806,6 +1814,7 @@ export class Game implements IGame, Logger {
     game.globalsPerGeneration = d.globalsPerGeneration;
     game.verminInEffect = d.verminInEffect;
     game.exploitationOfVenusInEffect = d.exploitationOfVenusInEffect;
+    game.eventPush = d.eventPush;
     // Still in Draft or Research of generation 1
     if (game.generation === 1 && players.some((p) => p.playedCards.filter(isICorporationCard).length === 0)) {
       if (game.phase === Phase.INITIALDRAFTING) {

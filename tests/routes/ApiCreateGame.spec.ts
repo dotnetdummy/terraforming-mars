@@ -9,6 +9,7 @@ import {RandomMAOptionType} from '../../src/common/ma/RandomMAOptionType';
 import {SimpleGameModel} from '../../src/common/models/SimpleGameModel';
 import {FakeClock} from '../common/FakeClock';
 import {CardName} from '../../src/common/cards/CardName';
+import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '../../src/common/game/EventPush';
 
 // A complete create-game request for a one-player game.
 function newGameConfigForTest(): NewGameConfig {
@@ -320,5 +321,63 @@ describe('ApiCreateGame', () => {
     const res3 = new MockResponse();
     await postGame(apiCreateGame, req3, res3);
     expect(res3.statusCode).not.eq(statusCode.tooManyRequests);
+  });
+
+  it('posts game started and the initial waiting event', async () => {
+    const calls: Array<{init: {headers?: Record<string, string>, body?: string}}> = [];
+    const originalFetch = global.fetch;
+    global.fetch = (async (_url: unknown, init?: {headers?: Record<string, string>, body?: unknown}) => {
+      calls.push({
+        init: {
+          headers: init?.headers,
+          body: typeof init?.body === 'string' ? init.body : undefined,
+        },
+      });
+      return new Response('ok', {status: 200});
+    }) as typeof fetch;
+
+    try {
+      await postConfig({
+        ...newGameConfigForTest(),
+        startingCorporations: 2,
+        eventPush: {
+          url: 'https://example.com/hook',
+          token: 'event-push-secret',
+          gameStarted: {enabled: true, body: DEFAULT_GAME_STARTED_BODY},
+          waitingForPlayer: {enabled: true, body: DEFAULT_WAITING_FOR_PLAYER_BODY},
+        },
+      });
+      expect(res.statusCode).eq(statusCode.ok);
+      expect(res.content).to.not.contain('event-push-secret');
+      const model = JSON.parse(res.content) as SimpleGameModel;
+      const game = await scaffolding.ctx.gameLoader.getGame(model.id);
+      expect(game?.eventPush?.token).eq('event-push-secret');
+      expect(calls).length(2);
+      const texts = calls.map((call) => JSON.parse(String(call.init.body)).text as string);
+      expect(texts[0]).to.contain(model.name);
+      expect(texts[0]).to.contain('Robot');
+      expect(texts[0]).to.contain(`/spectator?id=${model.spectatorId}`);
+      expect(texts[1]).eq('Waiting for player Robot at gen 1');
+      expect(calls[0].init.headers).deep.eq({
+        'Authorization': 'Bearer event-push-secret',
+        'Content-Type': 'application/json',
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('rejects an event push URL that is not http(s)', async () => {
+    await postConfig({
+      ...newGameConfigForTest(),
+      eventPush: {
+        url: 'ftp://example.com/hook',
+        token: 'secret',
+        gameStarted: {enabled: true, body: DEFAULT_GAME_STARTED_BODY},
+        waitingForPlayer: {enabled: false, body: ''},
+      },
+    });
+    expect(res.statusCode).eq(statusCode.badRequest);
+    expect(res.content).to.contain('http or https');
   });
 });
