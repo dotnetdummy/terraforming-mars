@@ -1,0 +1,40 @@
+# Pull-only stack: app image from Docker Hub + PostgreSQL.
+#
+#   cp .env.example .env
+#   docker compose up -d
+#
+# Point the cloudflared process already running on this host at http://127.0.0.1:8080.
+
+services:
+  terraforming-mars:
+    image: ${TFM_IMAGE:-dotnetdummy/terraforming-mars:latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-8080}:8080"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      # The host port above can change. The process inside the container always listens on 8080.
+      PORT: 8080
+      POSTGRES_HOST: postgresql://${POSTGRES_USER:-tfm}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tfm}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:18.2-alpine
+    shm_size: 1g
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tfm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-tfm}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata: {}

@@ -27,6 +27,24 @@ const DB_COMPRESS_ON_WRITE = stringToBoolean(process.env.DB_COMPRESS_ON_WRITE, f
 // between refreshes just get the cached values.
 const SIZE_STATS_COLLECTION_INTERVAL_MS = 5 * 60_000;
 
+/* SSL options for a Postgres connection string.
+
+A value that starts with `postgres` enables TLS and accepts a self-signed certificate, which Heroku requires. `sslmode=disable` leaves TLS off. Any other value leaves SSL unset.
+*/
+export function postgresConnectionSsl(connectionString: string | undefined): pg.ClientConfig['ssl'] {
+  if (connectionString === undefined || !connectionString.startsWith('postgres')) {
+    return undefined;
+  }
+  try {
+    if (new URL(connectionString).searchParams.get('sslmode') === 'disable') {
+      return undefined;
+    }
+  } catch {
+    // A non-URL string that still starts with `postgres` keeps the Heroku default.
+  }
+  return {rejectUnauthorized: false};
+}
+
 let activeDatabase: PostgreSQL | undefined;
 
 const metrics = {
@@ -83,11 +101,9 @@ export class PostgreSQL implements IDatabase {
     private config: pg.ClientConfig = {
       connectionString: process.env.POSTGRES_HOST,
     }) {
-    if (config.connectionString?.startsWith('postgres')) {
-      config.ssl = {
-        // heroku uses self-signed certificates
-        rejectUnauthorized: false,
-      };
+    const ssl = postgresConnectionSsl(config.connectionString);
+    if (ssl !== undefined) {
+      config.ssl = ssl;
     }
     this.metricsScrapeCache = new ThrottledCache(
       new Clock(),
