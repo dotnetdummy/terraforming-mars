@@ -34,11 +34,4 @@ jobs:
     - run: npm run build:tests
     - run: npm test
 
-  build-docker:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v5
-    - run: docker build .
-
 

@@ -11,22 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-    - uses: actions/setup-node@v5
-      with:
-        node-version: 22
-    - run: npm ci
-    - run: npm run make:static
-    - run: npm run lint
-    - run: npm run build
-    - run: npm run build:tests
-    - run: npm test
-
   docker:
-    needs: check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,6 +35,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             SOURCE_VERSION=${{ github.sha }}
