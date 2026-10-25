@@ -184,6 +184,10 @@ export class JSONProcessor {
       this.model.eventPushWaitingForPlayer = eventPush.waitingForPlayer.enabled;
       this.model.eventPushWaitingForPlayerBody = eventPush.waitingForPlayer.body;
     }
+    if (isEventConfig(eventPush.gameEnded)) {
+      this.model.eventPushGameEnded = eventPush.gameEnded.enabled;
+      this.model.eventPushGameEndedBody = eventPush.gameEnded.body;
+    }
   }
 
   private validateCardNames(fieldLabel: string, names: ReadonlyArray<CardName>): void {

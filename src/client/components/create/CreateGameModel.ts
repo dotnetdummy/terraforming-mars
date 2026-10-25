@@ -69,4 +69,6 @@ export type CreateGameModel = {
   eventPushGameStartedBody: string;
   eventPushWaitingForPlayer: boolean;
   eventPushWaitingForPlayerBody: string;
+  eventPushGameEnded: boolean;
+  eventPushGameEndedBody: string;
 }

@@ -3,7 +3,7 @@ import {BoardName} from '@/common/boards/BoardName';
 import {DEFAULT_EXPANSIONS} from '@/common/cards/GameModule';
 import {RandomMAOptionType} from '@/common/ma/RandomMAOptionType';
 import {CreateGameModel} from './CreateGameModel';
-import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '@/common/game/EventPush';
+import {DEFAULT_GAME_ENDED_BODY, DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '@/common/game/EventPush';
 
 export function defaultCreateGameModel(): CreateGameModel {
   return {
@@ -77,5 +77,7 @@ export function defaultCreateGameModel(): CreateGameModel {
     eventPushGameStartedBody: DEFAULT_GAME_STARTED_BODY,
     eventPushWaitingForPlayer: true,
     eventPushWaitingForPlayerBody: DEFAULT_WAITING_FOR_PLAYER_BODY,
+    eventPushGameEnded: true,
+    eventPushGameEndedBody: DEFAULT_GAME_ENDED_BODY,
   };
 }

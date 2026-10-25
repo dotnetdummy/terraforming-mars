@@ -3,8 +3,8 @@ import {Game} from '../../../src/server/Game';
 import {Server} from '../../../src/server/models/ServerModel';
 import {SelectOption} from '../../../src/server/inputs/SelectOption';
 import {DEFAULT_URL_ROOT} from '../../../src/common/constants';
-import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY, EventPushConfig} from '../../../src/common/game/EventPush';
-import {notifyGameCreated, notifyNewWaits, playersWithRequiredInput} from '../../../src/server/game/EventPush';
+import {DEFAULT_GAME_ENDED_BODY, DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY, EventPushConfig} from '../../../src/common/game/EventPush';
+import {notifyGameCreated, notifyGameEnded, notifyNewWaits, playersWithRequiredInput} from '../../../src/server/game/EventPush';
 import {testGame} from '../../TestGame';
 
 type Call = {
@@ -75,6 +75,49 @@ describe('EventPush', () => {
     expect(text).to.contain(`/player?id=${player1.id}`);
     expect(text).to.contain(`/spectator?id=${game.spectatorId}`);
     expect(text).to.not.contain('secret-token');
+  });
+
+  it('posts game ended with the winner, standings, and results link', async () => {
+    const [game, player] = testGame(1);
+    const push = config();
+    push.gameEnded = {enabled: true, body: DEFAULT_GAME_ENDED_BODY};
+    game.eventPush = push;
+
+    notifyGameEnded(game);
+    await flush();
+
+    const root = DEFAULT_URL_ROOT.endsWith('/') ? DEFAULT_URL_ROOT.slice(0, -1) : DEFAULT_URL_ROOT;
+    const text = JSON.parse(String(calls[0].init.body)).text as string;
+    expect(text).to.contain(`${player.name} lost`);
+    expect(text).to.contain(`- [${player.name}](${root}/player?id=${encodeURIComponent(player.id)})`);
+    expect(text).to.contain(' VP');
+    expect(text).to.contain(`Results: ${root}/the-end?id=${encodeURIComponent(game.spectatorId)}`);
+    expect(text).to.not.contain('secret-token');
+  });
+
+  it('names every tied winner', async () => {
+    const [game, player1, player2] = testGame(2);
+    const push = config();
+    push.gameEnded = {enabled: true, body: DEFAULT_GAME_ENDED_BODY};
+    game.eventPush = push;
+
+    notifyGameEnded(game);
+    await flush();
+
+    const text = JSON.parse(String(calls[0].init.body)).text as string;
+    expect(text).to.contain(`${player1.name} and ${player2.name} won`);
+    expect(text).to.contain(`- [${player1.name}](`);
+    expect(text).to.contain(`- [${player2.name}](`);
+  });
+
+  it('does not post game ended when that event is missing', async () => {
+    const [game] = testGame(1);
+    game.eventPush = config();
+
+    notifyGameEnded(game);
+    await flush();
+
+    expect(calls).length(0);
   });
 
   it('posts each player as a markdown link', async () => {

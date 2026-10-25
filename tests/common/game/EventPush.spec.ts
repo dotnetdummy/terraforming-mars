@@ -1,8 +1,11 @@
 import {expect} from 'chai';
 import {
+  DEFAULT_GAME_ENDED_BODY,
   DEFAULT_GAME_STARTED_BODY,
   DEFAULT_WAITING_FOR_PLAYER_BODY,
   EventPushConfig,
+  GAME_ENDED_ITEM_VARIABLES,
+  GAME_ENDED_VARIABLES,
   GAME_STARTED_VARIABLES,
   WAITING_FOR_PLAYER_VARIABLES,
   eventPushError,
@@ -110,6 +113,31 @@ describe('renderEventPushBody', () => {
     )).to.throw(/Unclosed \{\{#players\}\}/);
   });
 
+  it('renders the game ended body with standings and a results link', () => {
+    const rendered = renderEventPushBody(
+      DEFAULT_GAME_ENDED_BODY,
+      {
+        ...values,
+        resultsLink: 'http://localhost:8080/the-end?id=s1',
+        winnerNames: 'P1',
+        winnerLine: 'P1 won',
+      },
+      GAME_ENDED_VARIABLES,
+      [
+        {name: 'P1', link: 'http://localhost:8080/player?id=p1', color: 'red', vp: '80', megacredits: '6'},
+        {name: 'P2', link: 'http://localhost:8080/player?id=p2', color: 'blue', vp: '64', megacredits: '3'},
+      ],
+      GAME_ENDED_ITEM_VARIABLES,
+    );
+
+    expect(JSON.parse(rendered).text).eq(
+      'Remote Carbon Trace ended after gen 3. P1 won\n' +
+      '- [P1](http://localhost:8080/player?id=p1) 80 VP\n' +
+      '- [P2](http://localhost:8080/player?id=p2) 64 VP\n' +
+      'Results: http://localhost:8080/the-end?id=s1',
+    );
+  });
+
   it('rejects an unknown variable', () => {
     expect(() => renderEventPushBody('{ "text": "{{playerName}}" }', values, GAME_STARTED_VARIABLES))
       .to.throw(/Unknown variable playerName/);
@@ -152,6 +180,15 @@ describe('eventPushError', () => {
       ...config,
       gameStarted: {enabled: false, body: ''},
       waitingForPlayer: {enabled: false, body: ''},
-    })).eq('Enable Game started or Waiting for player.');
+    })).eq('Enable Game started, Waiting for player, or Game ended.');
+  });
+
+  it('accepts a game ended body on its own', () => {
+    expect(eventPushError({
+      ...config,
+      gameStarted: {enabled: false, body: ''},
+      waitingForPlayer: {enabled: false, body: ''},
+      gameEnded: {enabled: true, body: DEFAULT_GAME_ENDED_BODY},
+    })).eq(undefined);
   });
 });

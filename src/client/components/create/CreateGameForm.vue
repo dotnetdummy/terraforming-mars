@@ -502,6 +502,16 @@
                       <textarea class="form-input" rows="4" v-model="eventPushWaitingForPlayerBody" data-test="event-push-waiting-body"></textarea>
                       <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ waitingForPlayerVariables }}</div>
                     </template>
+                    <label class="form-switch">
+                      <input type="checkbox" v-model="eventPushGameEnded" id="event-push-game-ended">
+                      <i class="form-icon"></i>
+                      <span v-i18n>Game ended</span>
+                    </label>
+                    <template v-if="eventPushGameEnded">
+                      <textarea class="form-input" rows="4" v-model="eventPushGameEndedBody" data-test="event-push-game-ended-body"></textarea>
+                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ gameEndedVariables }}</div>
+                      <div class="create-game-event-push-variables"><span v-i18n>Player list</span>: {{ gameEndedPlayerListExample }} ({{ gameEndedItemVariables }})</div>
+                    </template>
                   </div>
                 </div>
 
@@ -624,7 +634,7 @@ import {RULEBOOK_URLS, WIKI_URLS} from '@/client/utils/WikiLinks';
 import {setDocumentTitle} from '@/client/utils/documentTitle';
 import {sanitizeEscapeVelocityOptions} from '@/common/game/escapeVelocity';
 import {validateNewGameConfig, validationDetails, ValidationErrors} from '@/common/game/validateNewGameConfig';
-import {GAME_STARTED_VARIABLES, PLAYER_ITEM_VARIABLES, WAITING_FOR_PLAYER_VARIABLES} from '@/common/game/EventPush';
+import {GAME_ENDED_ITEM_VARIABLES, GAME_ENDED_VARIABLES, GAME_STARTED_VARIABLES, PLAYER_ITEM_VARIABLES, WAITING_FOR_PLAYER_VARIABLES} from '@/common/game/EventPush';
 import ValidationErrorsPopup from './ValidationErrorsPopup.vue';
 
 function formatEventPushVariables(names: ReadonlyArray<string>): string {
@@ -799,6 +809,7 @@ export default defineComponent({
           token: this.eventPushToken,
           gameStarted: {enabled: this.eventPushGameStarted, body: this.eventPushGameStartedBody},
           waitingForPlayer: {enabled: this.eventPushWaitingForPlayer, body: this.eventPushWaitingForPlayerBody},
+          gameEnded: {enabled: this.eventPushGameEnded, body: this.eventPushGameEndedBody},
         } : undefined,
       };
     },
@@ -854,6 +865,15 @@ export default defineComponent({
     },
     waitingForPlayerVariables(): string {
       return formatEventPushVariables(WAITING_FOR_PLAYER_VARIABLES);
+    },
+    gameEndedVariables(): string {
+      return formatEventPushVariables(GAME_ENDED_VARIABLES);
+    },
+    gameEndedPlayerListExample(): string {
+      return '{{#players}}- [{{name}}]({{link}}) {{vp}} VP\\n{{/players}}';
+    },
+    gameEndedItemVariables(): string {
+      return formatEventPushVariables(GAME_ENDED_ITEM_VARIABLES);
     },
   },
   methods: {

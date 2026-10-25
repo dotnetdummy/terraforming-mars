@@ -3,7 +3,10 @@ import { DEFAULT_URL_ROOT } from '@/common/constants';
 import {
   EventPushConfig,
   EventPushPlayer,
+  GAME_ENDED_ITEM_VARIABLES,
+  GAME_ENDED_VARIABLES,
   GAME_STARTED_VARIABLES,
+  PLAYER_ITEM_VARIABLES,
   renderEventPushBody,
   WAITING_FOR_PLAYER_VARIABLES,
 } from '@/common/game/EventPush';
@@ -35,6 +38,28 @@ export function notifyGameCreated(game: IGame): void {
   notifyNewWaits(game, new Set());
 }
 
+/** Sends Game ended with the final standings. */
+export function notifyGameEnded(game: IGame): void {
+  if (game.eventPush?.gameEnded?.enabled !== true) {
+    return;
+  }
+  try {
+    const placed = playersInPlace(game);
+    send(
+      game,
+      'gameEnded',
+      gameEndedValues(game, placed),
+      placed.map((entry) => eventPushPlayer(entry.player, entry.vp)),
+      GAME_ENDED_ITEM_VARIABLES,
+    );
+  } catch (err) {
+    console.warn(
+      `Event push for game ${game.id} was not sent:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 /**
  * Sends Waiting for player for players who now have a required input and did not before.
  */
@@ -59,25 +84,26 @@ export function notifyNewWaits(
 
 function send(
   game: IGame,
-  which: 'gameStarted' | 'waitingForPlayer',
+  which: 'gameStarted' | 'waitingForPlayer' | 'gameEnded',
   values: Readonly<Record<string, string>>,
   players?: ReadonlyArray<EventPushPlayer>,
+  itemVariables: ReadonlyArray<string> = PLAYER_ITEM_VARIABLES,
 ): void {
   const config = game.eventPush;
   if (config === undefined) {
     return;
   }
   const event = config[which];
-  if (event.enabled !== true) {
+  if (event === undefined || event.enabled !== true) {
     return;
   }
   const allowed =
-    which === 'gameStarted' ?
-      GAME_STARTED_VARIABLES :
-      WAITING_FOR_PLAYER_VARIABLES;
+    which === 'gameStarted' ? GAME_STARTED_VARIABLES :
+      which === 'waitingForPlayer' ? WAITING_FOR_PLAYER_VARIABLES :
+        GAME_ENDED_VARIABLES;
   let body: string;
   try {
-    body = renderEventPushBody(event.body, values, allowed, players);
+    body = renderEventPushBody(event.body, values, allowed, players, itemVariables);
   } catch (err) {
     console.warn(
       `Event push for game ${game.id} was not sent:`,
@@ -144,12 +170,72 @@ function clip(text: string): string {
   return `${text.slice(0, limit)}…`;
 }
 
-function eventPushPlayers(game: IGame): Array<EventPushPlayer> {
-  return game.playersInGenerationOrder.map((player) => ({
+type PlacedPlayer = {
+  player: IPlayer;
+  vp: number;
+};
+
+function playersInPlace(game: IGame): Array<PlacedPlayer> {
+  const placed = game.players.map((player) => ({
+    player,
+    vp: player.getVictoryPoints().total,
+  }));
+  placed.sort((a, b) => {
+    if (a.vp !== b.vp) {
+      return b.vp - a.vp;
+    }
+    return b.player.megaCredits - a.player.megaCredits;
+  });
+  return placed;
+}
+
+function winners(game: IGame, placed: ReadonlyArray<PlacedPlayer>): Array<PlacedPlayer> {
+  const first = placed[0];
+  if (first === undefined || (game.isSoloMode() && !game.isSoloModeWin())) {
+    return [];
+  }
+  return placed.filter((entry) => entry.vp === first.vp && entry.player.megaCredits === first.player.megaCredits);
+}
+
+function winnerLine(placed: ReadonlyArray<PlacedPlayer>, winning: ReadonlyArray<PlacedPlayer>): string {
+  if (winning.length === 0) {
+    return `${placed[0]?.player.name ?? 'Nobody'} lost`;
+  }
+  const names = winning.map((entry) => entry.player.name);
+  if (names.length === 1) {
+    return `${names[0]} won`;
+  }
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]} won`;
+  }
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]} won`;
+}
+
+function eventPushPlayer(player: IPlayer, vp?: number): EventPushPlayer {
+  const values: EventPushPlayer = {
     name: player.name,
     link: playerLink(player.id),
     color: player.color,
-  }));
+  };
+  if (vp !== undefined) {
+    values.vp = String(vp);
+    values.megacredits = String(player.megaCredits);
+  }
+  return values;
+}
+
+function eventPushPlayers(game: IGame): Array<EventPushPlayer> {
+  return game.playersInGenerationOrder.map((player) => eventPushPlayer(player));
+}
+
+function gameEndedValues(game: IGame, placed: ReadonlyArray<PlacedPlayer>): Record<string, string> {
+  const winning = winners(game, placed);
+  return {
+    ...sharedValues(game),
+    resultsLink: resultsLink(game.spectatorId),
+    winnerNames: winning.map((entry) => entry.player.name).join(', '),
+    winnerLine: winnerLine(placed, winning),
+  };
 }
 
 function gameStartedValues(game: IGame): Record<string, string> {
@@ -192,6 +278,10 @@ function playerLink(playerId: string): string {
 
 function spectatorLink(spectatorId: string): string {
   return participantLink(paths.SPECTATOR, spectatorId);
+}
+
+function resultsLink(spectatorId: string): string {
+  return participantLink(paths.THE_END, spectatorId);
 }
 
 function participantLink(path: string, id: string): string {

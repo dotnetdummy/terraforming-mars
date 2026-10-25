@@ -2,8 +2,9 @@
  * One event the game can POST.
  *
  * `body` is JSON text. `{{variable}}` is replaced inside that text.
- * Game started may repeat `{{#players}}...{{/players}}` once per player.
+ * Game started and Game ended may repeat `{{#players}}...{{/players}}` once per player.
  * Inside that block, `{{name}}`, `{{link}}`, and `{{color}}` are that player.
+ * Game ended also provides `{{vp}}` and `{{megacredits}}` there.
  * A newline in the sent text is `\n` inside the JSON string.
  */
 export type EventPushEventConfig = {
@@ -17,6 +18,10 @@ export type EventPushPlayer = {
   name: string;
   link: string;
   color: string;
+  /** Total victory points. Present for Game ended. */
+  vp?: string;
+  /** M€ left, the tiebreaker. Present for Game ended. */
+  megacredits?: string;
 };
 
 /**
@@ -29,6 +34,8 @@ export type EventPushConfig = {
   token: string;
   gameStarted: EventPushEventConfig;
   waitingForPlayer: EventPushEventConfig;
+  /** Absent on games created before this event existed, which means off. */
+  gameEnded?: EventPushEventConfig;
 };
 
 const SHARED_VARIABLES = ['gameId', 'gameName', 'generation', 'phase', 'playerCount', 'spectatorLink'] as const;
@@ -37,13 +44,19 @@ export const GAME_STARTED_VARIABLES = [...SHARED_VARIABLES, 'playerNames', 'play
 
 export const WAITING_FOR_PLAYER_VARIABLES = [...SHARED_VARIABLES, 'playerName', 'playerColor', 'playerLink'] as const;
 
+export const GAME_ENDED_VARIABLES = [...SHARED_VARIABLES, 'resultsLink', 'winnerNames', 'winnerLine'] as const;
+
 export const DEFAULT_GAME_STARTED_BODY = '{ "text": "{{gameName}} started with {{playerCount}} players: {{playerSummary}}. Spectator: {{spectatorLink}}" }';
 
 export const DEFAULT_WAITING_FOR_PLAYER_BODY = '{ "text": "Waiting for player {{playerName}} at gen {{generation}}" }';
 
+export const DEFAULT_GAME_ENDED_BODY = '{ "text": "{{gameName}} ended after gen {{generation}}. {{winnerLine}}\\n{{#players}}- [{{name}}]({{link}}) {{vp}} VP\\n{{/players}}Results: {{resultsLink}}" }';
+
 const PLACEHOLDER = /\{\{\s*([^}]+?)\s*\}\}/g;
 const PLAYER_BLOCK = /\{\{\s*#players\s*\}\}([\s\S]*?)\{\{\s*\/players\s*\}\}/g;
 export const PLAYER_ITEM_VARIABLES = ['name', 'link', 'color'] as const;
+
+export const GAME_ENDED_ITEM_VARIABLES = [...PLAYER_ITEM_VARIABLES, 'vp', 'megacredits'] as const;
 
 type BodyPart =
   | {kind: 'text', text: string}
@@ -61,6 +74,9 @@ const SAMPLE_VALUES: Record<string, string> = {
   playerName: 'Alice',
   playerColor: 'red',
   playerLink: 'http://localhost:8080/player?id=p1',
+  resultsLink: 'http://localhost:8080/the-end?id=s123',
+  winnerNames: 'Alice',
+  winnerLine: 'Alice won',
 };
 
 const SAMPLE_PLAYERS: Array<EventPushPlayer> = [
@@ -68,11 +84,16 @@ const SAMPLE_PLAYERS: Array<EventPushPlayer> = [
   {name: 'Bob', link: 'http://localhost:8080/player?id=p2', color: 'blue'},
 ];
 
+const SAMPLE_END_PLAYERS: Array<EventPushPlayer> = [
+  {name: 'Alice', link: 'http://localhost:8080/player?id=p1', color: 'red', vp: '80', megacredits: '20'},
+  {name: 'Bob', link: 'http://localhost:8080/player?id=p2', color: 'blue', vp: '75', megacredits: '15'},
+];
+
 /**
  * Substitutes `{{variable}}` placeholders in `body`.
  *
  * When `players` is passed, `{{#players}}...{{/players}}` is repeated once per player.
- * Inside that block, `name`, `link`, and `color` are that player.
+ * Inside that block, `itemVariables` are that player. `name`, `link`, and `color` are always available.
  * Each value is inserted as text, with JSON string escaping and no added quotes.
  * Throws when a placeholder is unknown, a block is unclosed, or the result is not JSON.
  */
@@ -81,8 +102,9 @@ export function renderEventPushBody(
   values: Readonly<Record<string, string>>,
   allowed: ReadonlyArray<string>,
   players?: ReadonlyArray<EventPushPlayer>,
+  itemVariables: ReadonlyArray<string> = PLAYER_ITEM_VARIABLES,
 ): string {
-  const rendered = renderParts(splitPlayerBlocks(body, players), values, allowed, players ?? []);
+  const rendered = renderParts(splitPlayerBlocks(body, players), values, allowed, players ?? [], itemVariables);
   JSON.parse(rendered);
   return rendered;
 }
@@ -119,8 +141,8 @@ export function eventPushError(eventPush: EventPushConfig | null | undefined): s
   if (eventPush.token.trim() === '') {
     return 'Event push token is required.';
   }
-  if (!eventPush.gameStarted.enabled && !eventPush.waitingForPlayer.enabled) {
-    return 'Enable Game started or Waiting for player.';
+  if (!eventPush.gameStarted.enabled && !eventPush.waitingForPlayer.enabled && eventPush.gameEnded?.enabled !== true) {
+    return 'Enable Game started, Waiting for player, or Game ended.';
   }
   if (eventPush.gameStarted.enabled) {
     const bodyError = eventPushBodyError(eventPush.gameStarted.body, GAME_STARTED_VARIABLES, SAMPLE_PLAYERS);
@@ -134,6 +156,12 @@ export function eventPushError(eventPush: EventPushConfig | null | undefined): s
       return `Waiting for player: ${bodyError}`;
     }
   }
+  if (eventPush.gameEnded?.enabled === true) {
+    const bodyError = eventPushBodyError(eventPush.gameEnded.body, GAME_ENDED_VARIABLES, SAMPLE_END_PLAYERS, GAME_ENDED_ITEM_VARIABLES);
+    if (bodyError !== undefined) {
+      return `Game ended: ${bodyError}`;
+    }
+  }
   return undefined;
 }
 
@@ -141,13 +169,14 @@ function eventPushBodyError(
   body: string,
   allowed: ReadonlyArray<string>,
   players?: ReadonlyArray<EventPushPlayer>,
+  itemVariables: ReadonlyArray<string> = PLAYER_ITEM_VARIABLES,
 ): string | undefined {
   const values: Record<string, string> = {};
   for (const name of allowed) {
     values[name] = SAMPLE_VALUES[name] ?? '';
   }
   try {
-    renderEventPushBody(body, values, allowed, players);
+    renderEventPushBody(body, values, allowed, players, itemVariables);
   } catch (err) {
     if (err instanceof SyntaxError) {
       return 'Body must be JSON after substituting variables.';
@@ -184,6 +213,7 @@ function renderParts(
   values: Readonly<Record<string, string>>,
   allowed: ReadonlyArray<string>,
   players: ReadonlyArray<EventPushPlayer>,
+  itemVariables: ReadonlyArray<string>,
 ): string {
   let rendered = '';
   for (const part of parts) {
@@ -192,14 +222,25 @@ function renderParts(
       continue;
     }
     for (const player of players) {
-      rendered += substitute(part.inner, {
-        name: player.name,
-        link: player.link,
-        color: player.color,
-      }, PLAYER_ITEM_VARIABLES);
+      rendered += substitute(part.inner, playerItemValues(player), itemVariables);
     }
   }
   return rendered;
+}
+
+function playerItemValues(player: EventPushPlayer): Record<string, string> {
+  const values: Record<string, string> = {
+    name: player.name,
+    link: player.link,
+    color: player.color,
+  };
+  if (player.vp !== undefined) {
+    values.vp = player.vp;
+  }
+  if (player.megacredits !== undefined) {
+    values.megacredits = player.megacredits;
+  }
+  return values;
 }
 
 /** Replaces `{{variable}}` in `text`. `allowed` is the only names that may appear. */
@@ -231,7 +272,8 @@ function isEventPushConfig(value: object): value is EventPushConfig {
   return typeof record.url === 'string' &&
     typeof record.token === 'string' &&
     isEventConfig(record.gameStarted) &&
-    isEventConfig(record.waitingForPlayer);
+    isEventConfig(record.waitingForPlayer) &&
+    (record.gameEnded === undefined || isEventConfig(record.gameEnded));
 }
 
 function isEventConfig(value: EventPushEventConfig | undefined): value is EventPushEventConfig {

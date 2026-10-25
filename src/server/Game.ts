@@ -22,6 +22,7 @@ import {milestoneManifest} from './milestones/Milestones';
 import {awardManifest} from './awards/Awards';
 import {PartyHooks} from './turmoil/parties/PartyHooks';
 import {Phase} from '../common/Phase';
+import {notifyGameEnded} from './game/EventPush';
 import {IPlayer} from './IPlayer';
 import {Player} from './Player';
 import {PlayerId, GameId, SpectatorId, SpaceId} from '../common/Types';
@@ -1137,6 +1138,7 @@ export class Game implements IGame, Logger {
     const gameLoader = GameLoader.getInstance();
     await gameLoader.saveGame(this);
     gameLoader.completeGame(this);
+    notifyGameEnded(this);
   }
 
   // Part of final greenery placement.

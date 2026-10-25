@@ -89,8 +89,12 @@ describe('CreateGameForm', () => {
     expect(eventPush.token).eq('secret');
     expect(eventPush.gameStarted.enabled).eq(true);
     expect(eventPush.waitingForPlayer.body).to.contain('{{playerName}}');
+    expect(eventPush.gameEnded.enabled).eq(true);
+    expect(eventPush.gameEnded.body).to.contain('{{resultsLink}}');
     expect(wrapper.text()).to.contain('{{#players}}');
     expect(wrapper.text()).to.contain('{{color}}');
+    expect(wrapper.text()).to.contain('Game ended');
+    expect(wrapper.text()).to.contain('{{winnerLine}}');
   });
 
   it('restores saved event push settings', () => {

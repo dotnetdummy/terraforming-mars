@@ -6,7 +6,7 @@ import {BoardName} from '@/common/boards/BoardName';
 import {JSONObject} from '@/common/Types';
 import {CreateGameModel} from '@/client/components/create/CreateGameModel';
 import {CardName} from '@/common/cards/CardName';
-import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '@/common/game/EventPush';
+import {DEFAULT_GAME_ENDED_BODY, DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '@/common/game/EventPush';
 
 type Case = {
   description: string,
@@ -167,6 +167,8 @@ const TEMPLATE_EXPECTED: CreateGameModel = {
   eventPushGameStartedBody: DEFAULT_GAME_STARTED_BODY,
   eventPushWaitingForPlayer: true,
   eventPushWaitingForPlayerBody: DEFAULT_WAITING_FOR_PLAYER_BODY,
+  eventPushGameEnded: true,
+  eventPushGameEndedBody: DEFAULT_GAME_ENDED_BODY,
 };
 
 const cases: Array<Case> = [
