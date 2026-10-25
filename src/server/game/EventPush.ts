@@ -123,8 +123,6 @@ async function postEventPush(
   config: EventPushConfig,
   body: string,
 ): Promise<void> {
-  console.debug({ body });
-
   const response = await fetch(config.url.trim(), {
     method: 'POST',
     redirect: 'error',
