@@ -47,13 +47,24 @@ describe('renderEventPushBody', () => {
     expect(JSON.parse(rendered).text).eq('Waiting for player A"B\\C');
   });
 
-  it('inserts playerSummary as text', () => {
-    const rendered = renderEventPushBody(DEFAULT_GAME_STARTED_BODY, values, GAME_STARTED_VARIABLES);
-    const text = JSON.parse(rendered).text as string;
+  it('renders the default game started body as a markdown player list', () => {
+    const rendered = renderEventPushBody(
+      DEFAULT_GAME_STARTED_BODY,
+      values,
+      GAME_STARTED_VARIABLES,
+      [
+        {name: 'Alice', link: 'http://localhost:8080/player?id=p1', color: 'red'},
+        {name: 'Bob', link: 'http://localhost:8080/player?id=p2', color: 'blue'},
+      ],
+    );
 
-    expect(text).to.contain('Alice (http://localhost:8080/player?id=p1)');
-    expect(text).to.contain('Bob (http://localhost:8080/player?id=p2)');
-    expect(text).to.contain('http://localhost:8080/spectator?id=s1');
+    expect(JSON.parse(rendered).text).eq(
+      'New game **Remote Carbon Trace** started with 2 players:\n' +
+      '- [Alice](http://localhost:8080/player?id=p1)\n' +
+      '- [Bob](http://localhost:8080/player?id=p2)\n' +
+      '\n\n' +
+      'Spectators can view it from [here](http://localhost:8080/spectator?id=s1).',
+    );
   });
 
   it('repeats a player block as markdown lines', () => {
@@ -131,7 +142,7 @@ describe('renderEventPushBody', () => {
     );
 
     expect(JSON.parse(rendered).text).eq(
-      'Remote Carbon Trace ended after gen 3. P1 won\n' +
+      '**Remote Carbon Trace** ended after gen 3. P1 won\n' +
       '- [P1](http://localhost:8080/player?id=p1) 80 VP\n' +
       '- [P2](http://localhost:8080/player?id=p2) 64 VP\n' +
       'Results: http://localhost:8080/the-end?id=s1',
