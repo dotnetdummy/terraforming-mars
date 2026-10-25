@@ -115,7 +115,7 @@ export class Game implements IGame, Logger {
   public rng: SeededRandom;
   public spectatorId: SpectatorId;
   /** Outbound event push configured when the game was created. Absent when the creator did not set one. */
-  public eventPush: EventPushConfig | undefined = undefined;
+  public eventPush: EventPushConfig | undefined;
   public deferredActions: DeferredActionsQueue = new DeferredActionsQueue();
   public createdTime: Date = new Date(0);
   public gameAge: number = 0; // Each log event increases it
@@ -463,7 +463,9 @@ export class Game implements IGame, Logger {
 
     game.log('Generation ${0}', (b) => b.forNewGeneration().number(game.generation));
 
-    game.eventPush = eventPush;
+    if (eventPush !== undefined) {
+      game.eventPush = eventPush;
+    }
     game.gotoInitialPhase();
 
     return game;
@@ -1816,7 +1818,9 @@ export class Game implements IGame, Logger {
     game.globalsPerGeneration = d.globalsPerGeneration;
     game.verminInEffect = d.verminInEffect;
     game.exploitationOfVenusInEffect = d.exploitationOfVenusInEffect;
-    game.eventPush = d.eventPush;
+    if (d.eventPush !== undefined) {
+      game.eventPush = d.eventPush;
+    }
     // Still in Draft or Research of generation 1
     if (game.generation === 1 && players.some((p) => p.playedCards.filter(isICorporationCard).length === 0)) {
       if (game.phase === Phase.INITIALDRAFTING) {
