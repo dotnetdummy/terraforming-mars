@@ -46,11 +46,11 @@ export const WAITING_FOR_PLAYER_VARIABLES = [...SHARED_VARIABLES, 'playerName', 
 
 export const GAME_ENDED_VARIABLES = [...SHARED_VARIABLES, 'resultsLink', 'winnerNames', 'winnerLine'] as const;
 
-export const DEFAULT_GAME_STARTED_BODY = '{ "text": "{{gameName}} started with {{playerCount}} players: {{playerSummary}}. Spectator: {{spectatorLink}}" }';
+export const DEFAULT_GAME_STARTED_BODY = '{ "text": "New game **{{gameName}}** started with {{playerCount}} players:\\n{{#players}}- [{{name}}]({{link}})\\n{{/players}}\\n\\nSpectators can view it from [here]({{spectatorLink}})." }';
 
-export const DEFAULT_WAITING_FOR_PLAYER_BODY = '{ "text": "Waiting for player {{playerName}} at gen {{generation}}" }';
+export const DEFAULT_WAITING_FOR_PLAYER_BODY = '{ "text": "Waiting for @{{playerName}} \\n- Gen: {{generation}}\\n- Phase: {{phase}}\\n\\nGo to [board]({{playerLink}})." }';
 
-export const DEFAULT_GAME_ENDED_BODY = '{ "text": "{{gameName}} ended after gen {{generation}}. {{winnerLine}}\\n{{#players}}- [{{name}}]({{link}}) {{vp}} VP\\n{{/players}}Results: {{resultsLink}}" }';
+export const DEFAULT_GAME_ENDED_BODY = '{ "text": "**{{gameName}}** ended after gen {{generation}}. {{winnerLine}}\\n{{#players}}- [{{name}}]({{link}}) {{vp}} VP\\n{{/players}}Results: {{resultsLink}}" }';
 
 const PLACEHOLDER = /\{\{\s*([^}]+?)\s*\}\}/g;
 const PLAYER_BLOCK = /\{\{\s*#players\s*\}\}([\s\S]*?)\{\{\s*\/players\s*\}\}/g;

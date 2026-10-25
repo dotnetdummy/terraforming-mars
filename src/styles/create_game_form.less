@@ -470,21 +470,101 @@
 }
 
 .create-game-event-push {
-  margin: 12px 20px 0;
+  // Same grey tile as the other create-game settings.
+  flex: 0 0 calc(100% - 20px);
+  box-sizing: border-box;
+  margin: 8px 10px 12px;
+  padding: 12px 16px 16px;
+  background-color: @grey_850;
+  border-radius: 8px;
   color: #ccc;
 
-  .form-group {
+  .create-game-event-push-panel {
     margin-top: 8px;
   }
 
+  .create-game-event-push-connection,
+  .create-game-event-push-events {
+    display: grid;
+    gap: 12px 16px;
+  }
+
+  .create-game-event-push-connection {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .create-game-event-push-events {
+    box-sizing: border-box;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 8px;
+
+    > div {
+      min-width: 0;
+    }
+  }
+
+  .create-game-event-push-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin-top: 8px;
+  }
+
+  .create-game-event-push-messages {
+    margin-top: 4px;
+
+    > summary {
+      cursor: pointer;
+      width: fit-content;
+    }
+  }
+
+  .create-game-event-push-event-title {
+    margin-bottom: 4px;
+  }
+
+  .form-group {
+    margin: 0;
+  }
+
   textarea {
-    min-height: 6em;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-height: 4.5em;
+    height: auto;
     font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
   }
 
   .create-game-event-push-variables {
-    font-size: 14px;
-    margin: 4px 0 12px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #999;
+
+    summary {
+      cursor: pointer;
+    }
+
+    div {
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+@media only screen and (max-width: 1023px) {
+  .create-game-event-push {
+    grid-column: 1 / -1;
+    flex-basis: auto;
+    width: auto;
+    margin: 8px 4px 12px;
+
+    .create-game-event-push-connection,
+    .create-game-event-push-events {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 }
 

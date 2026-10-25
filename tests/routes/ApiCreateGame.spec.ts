@@ -9,6 +9,7 @@ import {RandomMAOptionType} from '../../src/common/ma/RandomMAOptionType';
 import {SimpleGameModel} from '../../src/common/models/SimpleGameModel';
 import {FakeClock} from '../common/FakeClock';
 import {CardName} from '../../src/common/cards/CardName';
+import {DEFAULT_URL_ROOT} from '../../src/common/constants';
 import {DEFAULT_GAME_STARTED_BODY, DEFAULT_WAITING_FOR_PLAYER_BODY} from '../../src/common/game/EventPush';
 
 // A complete create-game request for a one-player game.
@@ -357,7 +358,11 @@ describe('ApiCreateGame', () => {
       expect(texts[0]).to.contain(model.name);
       expect(texts[0]).to.contain('Robot');
       expect(texts[0]).to.contain(`/spectator?id=${model.spectatorId}`);
-      expect(texts[1]).eq('Waiting for player Robot at gen 1');
+      const root = DEFAULT_URL_ROOT.endsWith('/') ? DEFAULT_URL_ROOT.slice(0, -1) : DEFAULT_URL_ROOT;
+      const robot = game?.players.find((player) => player.name === 'Robot') ?? game?.players[0];
+      expect(texts[1]).eq(
+        `Waiting for @${robot?.name} \n- Gen: ${game?.generation}\n- Phase: ${game?.phase}\n\nGo to [board](${root}/player?id=${encodeURIComponent(robot?.id ?? '')}).`,
+      );
       expect(calls[0].init.headers).deep.eq({
         'Authorization': 'Bearer event-push-secret',
         'Content-Type': 'application/json',

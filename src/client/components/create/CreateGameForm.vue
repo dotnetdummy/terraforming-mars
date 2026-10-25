@@ -465,54 +465,75 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div class="create-game-event-push">
-                  <label class="form-switch">
-                    <input type="checkbox" v-model="eventPushEnabled" id="event-push-enabled" data-test="event-push-enabled">
-                    <i class="form-icon"></i>
-                    <span v-i18n>Event push</span>
-                  </label>
-                  <div v-if="eventPushEnabled">
-                    <div class="form-group">
-                      <label class="form-label" for="event-push-url" v-i18n>URL</label>
-                      <input class="form-input" type="url" id="event-push-url" v-model="eventPushUrl" data-test="event-push-url">
+                        <div class="create-game-event-push">
+                      <label class="form-switch">
+                        <input type="checkbox" v-model="eventPushEnabled" id="event-push-enabled" data-test="event-push-enabled">
+                        <i class="form-icon"></i>
+                        <span v-i18n>Event push</span>
+                      </label>
+                      <div v-if="eventPushEnabled" class="create-game-event-push-panel">
+                        <div class="create-game-event-push-connection">
+                          <div class="form-group">
+                            <label class="form-label" for="event-push-url" v-i18n>URL</label>
+                            <input class="form-input" type="url" id="event-push-url" v-model="eventPushUrl" data-test="event-push-url">
+                          </div>
+                          <div class="form-group">
+                            <label class="form-label" for="event-push-token" v-i18n>Token</label>
+                            <input class="form-input" type="password" id="event-push-token" v-model="eventPushToken" autocomplete="off" data-test="event-push-token">
+                          </div>
+                        </div>
+                        <div class="create-game-event-push-toggles">
+                          <label class="form-switch">
+                            <input type="checkbox" v-model="eventPushGameStarted" id="event-push-game-started">
+                            <i class="form-icon"></i>
+                            <span v-i18n>Game started</span>
+                          </label>
+                          <label class="form-switch">
+                            <input type="checkbox" v-model="eventPushWaitingForPlayer" id="event-push-waiting">
+                            <i class="form-icon"></i>
+                            <span v-i18n>Waiting for player</span>
+                          </label>
+                          <label class="form-switch">
+                            <input type="checkbox" v-model="eventPushGameEnded" id="event-push-game-ended">
+                            <i class="form-icon"></i>
+                            <span v-i18n>Game ended</span>
+                          </label>
+                        </div>
+                        <details class="create-game-event-push-messages">
+                          <summary v-i18n>Messages</summary>
+                          <div class="create-game-event-push-events">
+                            <div v-if="eventPushGameStarted">
+                              <div class="create-game-event-push-event-title" v-i18n>Game started</div>
+                              <textarea class="form-input" rows="3" v-model="eventPushGameStartedBody" data-test="event-push-game-started-body"></textarea>
+                              <details class="create-game-event-push-variables">
+                                <summary v-i18n>Variables</summary>
+                                <div>{{ gameStartedVariables }}</div>
+                                <div><span v-i18n>Player list</span>: {{ playerListExample }} ({{ playerItemVariables }})</div>
+                              </details>
+                            </div>
+                            <div v-if="eventPushWaitingForPlayer">
+                              <div class="create-game-event-push-event-title" v-i18n>Waiting for player</div>
+                              <textarea class="form-input" rows="3" v-model="eventPushWaitingForPlayerBody" data-test="event-push-waiting-body"></textarea>
+                              <details class="create-game-event-push-variables">
+                                <summary v-i18n>Variables</summary>
+                                <div>{{ waitingForPlayerVariables }}</div>
+                              </details>
+                            </div>
+                            <div v-if="eventPushGameEnded">
+                              <div class="create-game-event-push-event-title" v-i18n>Game ended</div>
+                              <textarea class="form-input" rows="3" v-model="eventPushGameEndedBody" data-test="event-push-game-ended-body"></textarea>
+                              <details class="create-game-event-push-variables">
+                                <summary v-i18n>Variables</summary>
+                                <div>{{ gameEndedVariables }}</div>
+                                <div><span v-i18n>Player list</span>: {{ gameEndedPlayerListExample }} ({{ gameEndedItemVariables }})</div>
+                              </details>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label" for="event-push-token" v-i18n>Token</label>
-                      <input class="form-input" type="password" id="event-push-token" v-model="eventPushToken" autocomplete="off" data-test="event-push-token">
                     </div>
-                    <label class="form-switch">
-                      <input type="checkbox" v-model="eventPushGameStarted" id="event-push-game-started">
-                      <i class="form-icon"></i>
-                      <span v-i18n>Game started</span>
-                    </label>
-                    <template v-if="eventPushGameStarted">
-                      <textarea class="form-input" rows="4" v-model="eventPushGameStartedBody" data-test="event-push-game-started-body"></textarea>
-                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ gameStartedVariables }}</div>
-                      <div class="create-game-event-push-variables"><span v-i18n>Player list</span>: {{ playerListExample }} ({{ playerItemVariables }})</div>
-                    </template>
-                    <label class="form-switch">
-                      <input type="checkbox" v-model="eventPushWaitingForPlayer" id="event-push-waiting">
-                      <i class="form-icon"></i>
-                      <span v-i18n>Waiting for player</span>
-                    </label>
-                    <template v-if="eventPushWaitingForPlayer">
-                      <textarea class="form-input" rows="4" v-model="eventPushWaitingForPlayerBody" data-test="event-push-waiting-body"></textarea>
-                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ waitingForPlayerVariables }}</div>
-                    </template>
-                    <label class="form-switch">
-                      <input type="checkbox" v-model="eventPushGameEnded" id="event-push-game-ended">
-                      <i class="form-icon"></i>
-                      <span v-i18n>Game ended</span>
-                    </label>
-                    <template v-if="eventPushGameEnded">
-                      <textarea class="form-input" rows="4" v-model="eventPushGameEndedBody" data-test="event-push-game-ended-body"></textarea>
-                      <div class="create-game-event-push-variables"><span v-i18n>Variables</span>: {{ gameEndedVariables }}</div>
-                      <div class="create-game-event-push-variables"><span v-i18n>Player list</span>: {{ gameEndedPlayerListExample }} ({{ gameEndedItemVariables }})</div>
-                    </template>
-                  </div>
                 </div>
 
                 <div class="create-game-action-row">
