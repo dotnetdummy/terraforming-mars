@@ -118,6 +118,8 @@ const handlers: Map<string, IHandler> = new Map(
     ['main.js.map', ServeAsset.INSTANCE],
     ['vendors.js', ServeAsset.INSTANCE],
     ['vendors.js.map', ServeAsset.INSTANCE],
+    ['sw.js', ServeAsset.INSTANCE],
+    ['sw.js.map', ServeAsset.INSTANCE],
     [paths.AUTH_DISCORD_CALLBACK, DiscordAuth.INSTANCE],
     [paths.NEW_GAME, ServeApp.INSTANCE],
     [paths.PLAYER, ServeApp.INSTANCE],
@@ -154,6 +156,10 @@ function getHandler(pathname: string): IHandler | undefined {
     return ServeAsset.INSTANCE;
   }
   if (pathname.startsWith('chunks/')) {
+    return ServeAsset.INSTANCE;
+  }
+  // Production bundles are named main.<contenthash>.js and vendors.<contenthash>.js.
+  if (/^(main|vendors)\.[0-9a-f]+\.js(\.map)?$/.test(pathname)) {
     return ServeAsset.INSTANCE;
   }
   return undefined;

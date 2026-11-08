@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const webpack = require('webpack');
 
@@ -12,6 +13,36 @@ const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 const zlib = require('zlib');
+
+const production = process.env.NODE_ENV === 'production';
+
+// Writes build/index.html with the content-hashed bundle names.
+// The script URLs have to change on every production build. Cloudflare caches
+// the old names for hours, and a stable main.js mixed with a new chunk throws
+// at startup because the module ids no longer match.
+class IndexHtmlPlugin {
+  apply(compiler) {
+    compiler.hooks.afterEmit.tap('IndexHtmlPlugin', (compilation) => {
+      const entry = compilation.entrypoints.get('main');
+      if (entry === undefined) {
+        throw new Error('Missing main entrypoint');
+      }
+      const scripts = entry.getFiles().filter((file) => file.endsWith('.js'));
+      const templatePath = path.resolve(__dirname, 'assets/index.html');
+      const template = fs.readFileSync(templatePath, 'utf8');
+      const scriptTags = scripts.map((file) => `<script src="${file}"></script>`).join('\n        ');
+      const html = template.replace(
+        /<script src="vendors\.js"><\/script>\s*<script src="main\.js"><\/script>/,
+        scriptTags,
+      );
+      if (html === template) {
+        throw new Error('assets/index.html is missing the vendors.js and main.js script tags');
+      }
+      fs.mkdirSync(compiler.outputPath, {recursive: true});
+      fs.writeFileSync(path.join(compiler.outputPath, 'index.html'), html);
+    });
+  }
+}
 
 const plugins = [
   new ForkTsCheckerWebpackPlugin({
@@ -45,7 +76,8 @@ const plugins = [
   },
 ];
 
-if (process.env.NODE_ENV === 'production') {
+if (production) {
+  plugins.push(new IndexHtmlPlugin());
   plugins.push(new CompressionPlugin());
   plugins.push(new CompressionPlugin({
     algorithm: 'brotliCompress',
@@ -54,14 +86,14 @@ if (process.env.NODE_ENV === 'production') {
   }));
 }
 
-if (process.env.NODE_ENV === 'development') {
+if (!production) {
   // Reports progress on the commandline during compilation.
   plugins.push(new webpack.ProgressPlugin());
 }
 
 module.exports = {
   devtool: 'source-map',
-  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  mode: production ? 'production' : 'development',
   entry: {
     main: './src/client/main.ts',
     sw: './src/client/sw.ts',
@@ -117,7 +149,17 @@ module.exports = {
     path: __dirname + '/build',
     hashFunction: 'xxhash64',
     publicPath: '',
-    chunkFilename: 'chunks/[name].js',
+    // The service worker is registered at a fixed URL. Every other script name
+    // includes its content hash so a deploy cannot pair a new runtime with an
+    // old cached chunk.
+    filename: (pathData) => {
+      const name = pathData.chunk && pathData.chunk.name;
+      if (!production || name === 'sw') {
+        return '[name].js';
+      }
+      return '[name].[contenthash].js';
+    },
+    chunkFilename: production ? 'chunks/[name].[contenthash].js' : 'chunks/[name].js',
   },
   optimization: {
     splitChunks: {

@@ -94,6 +94,11 @@ export class ServeAsset extends Handler {
       res.setHeader('Content-Encoding', toFile.encoding);
     }
 
+    // Browsers check sw.js for updates. A long cache keeps a broken copy installed.
+    if (path === 'sw.js' || path === 'sw.js.map') {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+
     if (buffer !== undefined) {
       res.setHeader('Content-Length', buffer.buffer.length);
       res.end(buffer.buffer);
@@ -140,6 +145,12 @@ export class ServeAsset extends Handler {
   private toFile(urlPath: string, encodings: Set<Encoding>): { file?: string, encoding?: Encoding } {
     switch (urlPath) {
     case 'assets/index.html':
+      // Production webpack writes build/index.html with the content-hashed script names.
+      if (isProduction()) {
+        return {file: 'build/index.html'};
+      }
+      return {file: urlPath};
+
     case 'assets/Prototype.ttf':
     case 'assets/Prototype-ru.ttf':
     case 'assets/Prototype-pl.ttf':
@@ -172,6 +183,11 @@ export class ServeAsset extends Handler {
       return {file: 'assets/favicon.ico'};
 
     default:
+      // main.<contenthash>.js and vendors.<contenthash>.js from the production build.
+      if (/^(main|vendors)\.[0-9a-f]+\.js(\.map)?$/.test(urlPath)) {
+        return this.toMainFile(urlPath, encodings);
+      }
+
       // Serve JS chunks produced by webpack code splitting.
       if (urlPath.startsWith('chunks/')) {
         const chunksRoot = path.resolve('./build/chunks');

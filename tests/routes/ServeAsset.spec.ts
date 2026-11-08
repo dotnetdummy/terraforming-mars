@@ -140,6 +140,23 @@ describe('ServeAsset', () => {
     });
   });
 
+  it('production index.html uses the hashed script names', async () => {
+    process.env.NODE_ENV = 'production';
+    instance = new ServeAsset(undefined, false, fileApi);
+    scaffolding.url = '/assets/index.html';
+    scaffolding.req.headers['accept-encoding'] = '';
+    await scaffolding.get(instance, res);
+    expect(res.content).eq('data: build/index.html');
+  });
+
+  it('content-hashed main bundle', async () => {
+    instance = new ServeAsset(undefined, false, fileApi);
+    scaffolding.url = '/main.a1b2c3d4.js';
+    scaffolding.req.headers['accept-encoding'] = '';
+    await scaffolding.get(instance, res);
+    expect(res.content).eq('data: build/main.a1b2c3d4.js');
+  });
+
   it('sw.js', async () => {
     instance = new ServeAsset(undefined, false, fileApi);
     scaffolding.url = '/sw.js';

@@ -13,6 +13,16 @@ describe('requestProcessor', () => {
     expect(req.url).eq('/assets/index.html');
   });
 
+  it('routes sw.js instead of returning not found', async () => {
+    const req = new MockRequest();
+    const res = new MockResponse();
+    req.url = '/sw.js';
+
+    await processRequest(req, res);
+
+    expect(res.content.toString()).to.not.equal('Not found');
+  });
+
   it('waits for the routed handler to finish writing the response before returning', async () => {
     // ServeAsset reads the file asynchronously, so this exercises a handler
     // that suspends on a real await before writing headers/body.
