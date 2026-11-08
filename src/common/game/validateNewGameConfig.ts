@@ -9,6 +9,7 @@ import {Message} from '../logs/Message';
 import {LogMessageDataType} from '../logs/LogMessageDataType';
 import {BoardName} from '../boards/BoardName';
 import {eventPushError} from './EventPush';
+import {validateCustomMA} from '../ma/CustomMA';
 
 const REVISED_COUNT_ALGORITHM = false;
 
@@ -29,6 +30,8 @@ export type ValidationErrors = {
   prelude2WithoutPrelude: boolean;
   deltaProjectWithoutPrelude: boolean;
   notEnoughCorporations: number;
+  /** Why customMA is invalid, or empty when it's valid. */
+  invalidCustomMA: string;
   /** Empty when event push is off or valid. Otherwise the reason it cannot be saved. */
   eventPush: string;
 };
@@ -105,6 +108,13 @@ export const validationDetails: Record<keyof ValidationErrors, {blocking: boolea
     blocking: true,
     message: (errors) => ({message: errors.eventPush, data: []}),
   },
+  invalidCustomMA: {
+    blocking: true,
+    message: (errors) => ({
+      message: 'Manual milestones and awards are invalid: ${0}',
+      data: [{type: LogMessageDataType.RAW_STRING, value: errors.invalidCustomMA}],
+    }),
+  },
 };
 
 export type Helpers = {
@@ -130,6 +140,7 @@ export function validateNewGameConfig(config: NewGameConfig, helpers: Helpers): 
     prelude2WithoutPrelude: false,
     deltaProjectWithoutPrelude: false,
     notEnoughCorporations: 0,
+    invalidCustomMA: '',
     eventPush: '',
   };
 
@@ -227,6 +238,12 @@ export function validateNewGameConfig(config: NewGameConfig, helpers: Helpers): 
       errors.notEnoughCeos = required;
     }
     errors.ceosMissingExpansions = config.customCeos.filter(isMissingExpansion);
+  }
+
+  try {
+    validateCustomMA(config.customMA, config.randomMA, config.expansions.venus);
+  } catch (e) {
+    errors.invalidCustomMA = e instanceof Error ? e.message : String(e);
   }
   return errors;
 }

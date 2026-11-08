@@ -6,6 +6,7 @@ import {RandomMAOptionType} from '../ma/RandomMAOptionType';
 import {AgendaStyle} from '../turmoil/Types';
 import {GameId} from '../Types';
 import {Expansion} from '../cards/GameModule';
+import {CustomMA} from '../ma/CustomMA';
 import {EventPushConfig} from './EventPush';
 
 export interface NewPlayerModel {
@@ -81,4 +82,5 @@ export type NewGameConfig = {
   startingPreludes: number;
   /** Present when the creator turned on event push. */
   eventPush?: EventPushConfig;
+  customMA?: CustomMA;
 }

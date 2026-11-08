@@ -41,6 +41,7 @@ import {SerializedGame} from './SerializedGame';
 import {SpaceBonus} from '../common/boards/SpaceBonus';
 import {TileType} from '../common/TileType';
 import {Turmoil} from './turmoil/Turmoil';
+import {AutomaGameSetup} from './automa/AutomaGameSetup';
 import {RandomMAOptionType} from '../common/ma/RandomMAOptionType';
 import {AresHandler} from './ares/AresHandler';
 import {AresData} from '../common/ares/AresData';
@@ -59,6 +60,7 @@ import {GrantVenusAltTrackBonusDeferred} from './venusNext/GrantVenusAltTrackBon
 import {PathfindersExpansion} from './pathfinders/PathfindersExpansion';
 import {PathfindersData} from './pathfinders/PathfindersData';
 import {DeltaProject} from './cards/delta/DeltaProject';
+import {MiningCard} from './cards/base/MiningCard';
 import {AddResourcesToCard} from './deferredActions/AddResourcesToCard';
 import {ColonyDeserializer} from './colonies/ColonyDeserializer';
 import {GameLoader} from './database/GameLoader';
@@ -106,6 +108,8 @@ export class Game implements IGame, Logger {
   public readonly name: string;
   public readonly gameOptions: Readonly<GameOptions>;
   public readonly players: ReadonlyArray<IPlayer>;
+  public readonly marsBotPlayer: IPlayer | undefined;
+  public readonly playersPlusMarsBot: ReadonlyArray<IPlayer>;
   // The API makes this readonly.
   public playersInGenerationOrder: ReadonlyArray<IPlayer> = [];
 
@@ -204,6 +208,7 @@ export class Game implements IGame, Logger {
     id: GameId,
     name: string,
     players: Array<IPlayer>,
+    marsBotPlayer: IPlayer | undefined,
     first: IPlayer,
     activePlayer: PlayerId,
     spectatorId: SpectatorId,
@@ -252,6 +257,9 @@ export class Game implements IGame, Logger {
         this.monsInsuranceOwner = player;
       }
     });
+    this.marsBotPlayer = marsBotPlayer;
+    this.playersPlusMarsBot = marsBotPlayer === undefined ? players : [...players, marsBotPlayer];
+    this.marsBotPlayer?.setup(this);
 
     this.tags = tags;
     this.globalParameterTracks = getGlobalParameterTracks(gameOptions.boardName);
@@ -338,13 +346,15 @@ export class Game implements IGame, Logger {
       gameOptions.initialDraftVariant = false;
       gameOptions.preludeDraftVariant = false;
       gameOptions.randomMA = RandomMAOptionType.NONE;
+      gameOptions.customMA = undefined;
 
       // Single player game player starts with 14TR
       players[0].setTerraformRating(14);
     }
 
     const name = generateGameName(UnseededRandom.INSTANCE);
-    const game = new Game(id, name, players, firstPlayer, activePlayer, spectatorId, gameOptions, rng, board, projectDeck, corporationDeck, preludeDeck, ceoDeck, Array.from(tags));
+    const marsBotPlayer = gameOptions.automa ? AutomaGameSetup.createMarsBotPlayer(id) : undefined;
+    const game = new Game(id, name, players, marsBotPlayer, firstPlayer, activePlayer, spectatorId, gameOptions, rng, board, projectDeck, corporationDeck, preludeDeck, ceoDeck, Array.from(tags));
     // This evaluation of created time doesn't match what's stored in the database, but that's fine.
     game.createdTime = new Date();
     // Initialize Ares data
@@ -374,10 +384,13 @@ export class Game implements IGame, Logger {
       game.underworldData = UnderworldExpansion.initialize(rng, gameOptions.boardName === BoardName.AMAZONIS_PLANITIA);
     }
 
-    // and 2 neutral cities and forests on board
     if (players.length === 1) {
-      //  Setup solo player's starting tiles
-      GameSetup.setupNeutralPlayer(game);
+      if (marsBotPlayer !== undefined) {
+        AutomaGameSetup.setup(game, marsBotPlayer);
+      } else {
+        //  Setup solo player's starting tiles
+        GameSetup.setupNeutralPlayer(game);
+      }
     }
 
     // Setup Ares hazards
@@ -554,7 +567,7 @@ export class Game implements IGame, Logger {
   }
 
   public isSoloMode() :boolean {
-    return this.players.length === 1;
+    return this.players.length === 1 && !this.gameOptions.automa;
   }
 
   // Function to retrieve a player by it's id
@@ -704,6 +717,7 @@ export class Game implements IGame, Logger {
 
   private playerHasPickedCorporationCard(player: IPlayer, corporationCard: ICorporationCard): void {
     player.pickedCorporationCard = corporationCard;
+    player.timer.enable();
     const players = this.playersInGenerationOrder;
     if (players.every((p) => p.pickedCorporationCard !== undefined)) {
       for (const p of players) {
@@ -1542,15 +1556,29 @@ export class Game implements IGame, Logger {
         {title: 'Select how to pay for building a colony'}))
         .andThen(() => this.defer(new BuildColony(player)));
       break;
-    case SpaceBonus.STANDARD_RESOURCE:
+    case SpaceBonus.STANDARD_RESOURCE: {
+      const gainStandardResource = (resource: Resource) => {
+        player.stock.add(resource, 1, {log: true});
+        onStandardResource?.(resource);
+        return undefined;
+      };
+      if (player.lastCardPlayed) {
+        const lastCardPlayed = player.tableau.get(player.lastCardPlayed);
+        // Mining cards treat this bonus as the steel or titanium production the player chose.
+        if (lastCardPlayed instanceof MiningCard) {
+          const miningResource = lastCardPlayed.bonusResource?.[0];
+          if (miningResource !== undefined) {
+            gainStandardResource(miningResource);
+            break;
+          }
+        }
+      }
+
       // A space has this bonus at most once. If one ever has more, use SelectResources (see Philares).
       player.defer(new SelectResource('Select a standard resource to gain')
-        .andThen((resource) => {
-          player.stock.add(resource, 1, {log: true});
-          onStandardResource?.(resource);
-          return undefined;
-        }));
+        .andThen(gainStandardResource));
       break;
+    }
     default:
       throw new Error('Unhandled space bonus ' + spaceBonus + '. Report this exact error, please.');
     }
@@ -1721,12 +1749,14 @@ export class Game implements IGame, Logger {
       gameOptions.escapeVelocity = sanitizeEscapeVelocityOptions(gameOptions.escapeVelocity);
     }
     const players = d.players.map((element) => Player.deserialize(element));
+    // MarsBot isn't serialized with the players, so it is recreated from the game id.
+    const marsBotPlayer = gameOptions.automa ? AutomaGameSetup.createMarsBotPlayer(d.id) : undefined;
     const first = players.find((player) => player.id === d.first);
     if (first === undefined) {
       throw new Error(`Player ${d.first} not found when rebuilding First Player`);
     }
 
-    const board = GameSetup.deserializeBoard(players, gameOptions, d);
+    const board = GameSetup.deserializeBoard(marsBotPlayer === undefined ? players : [...players, marsBotPlayer], gameOptions, d);
 
     const rng = new SeededRandom(d.seed, d.currentSeed);
 
@@ -1736,7 +1766,7 @@ export class Game implements IGame, Logger {
 
     const ceoDeck = CeoDeck.deserialize(d.ceoDeck, rng);
 
-    const game = new Game(d.id, d.name, players, first, d.activePlayer, d.spectatorId, gameOptions, rng, board, projectDeck, corporationDeck, preludeDeck, ceoDeck, d.tags);
+    const game = new Game(d.id, d.name, players, marsBotPlayer, first, d.activePlayer, d.spectatorId, gameOptions, rng, board, projectDeck, corporationDeck, preludeDeck, ceoDeck, d.tags);
     game.resettable = true;
     game.spectatorId = d.spectatorId;
     game.createdTime = new Date(d.createdTimeMs);
@@ -1751,7 +1781,7 @@ export class Game implements IGame, Logger {
     });
 
     game.milestones = milestones;
-    game.claimedMilestones = deserializeClaimedMilestones(d.claimedMilestones, players, milestones);
+    game.claimedMilestones = deserializeClaimedMilestones(d.claimedMilestones, game.playersPlusMarsBot, milestones);
 
     const awards: Array<IAward> = [];
     d.awards.forEach((awardName) => {
@@ -1763,7 +1793,7 @@ export class Game implements IGame, Logger {
     });
 
     game.awards = awards;
-    game.fundedAwards = deserializeFundedAwards(d.fundedAwards, players, awards);
+    game.fundedAwards = deserializeFundedAwards(d.fundedAwards, game.playersPlusMarsBot, awards);
 
     if (gameOptions.aresExtension) {
       game.aresData = d.aresData;
@@ -1778,7 +1808,7 @@ export class Game implements IGame, Logger {
 
     // Reload turmoil elements if needed
     if (d.turmoil && gameOptions.turmoilExtension) {
-      game.turmoil = Turmoil.deserialize(d.turmoil, players);
+      game.turmoil = Turmoil.deserialize(d.turmoil, game.playersPlusMarsBot);
     }
 
     // Reload moon elements if needed
