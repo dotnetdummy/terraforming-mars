@@ -94,6 +94,7 @@ describe('CreateGameForm', () => {
   });
 
   it('restores saved event push settings', () => {
+    PreferencesManager.INSTANCE.set('remember_create_game_settings', true);
     createGameSettingsStorage.save(createNewGameConfig({
       eventPush: {
         url: 'https://example.com/hook',
